@@ -1,0 +1,9 @@
+{
+    "webhook_url": "URL_WEBHOOK",
+    "rate_limit_time": 60,
+    "rate_limit_max": 5,
+    "api_keys": [
+        "cle_secrete_1",
+        "cle_secrete_2"
+    ]
+}
