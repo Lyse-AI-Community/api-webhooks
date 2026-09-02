@@ -42,44 +42,114 @@ if ($rate_data['count'] >= $config['rate_limit_max']) {
 $rate_data['count']++;
 file_put_contents($cache_file, json_encode($rate_data));
 
-$content = $_POST['content'] ?? null;
-$name = $_POST['name'] ?? null;
+$type      = $_POST['type'] ?? 'Training';
+$epoch      = $_POST['epoch'] ?? '0';
+$completion = $_POST['completion'] ?? '0/0 (0%)';
+$loss       = $_POST['loss'] ?? '1000000';
+$tps        = $_POST['tps'] ?? '0 tokens/s';
+$eta        = $_POST['eta'] ?? '0 h';
 
-var_dump($_POST);
-
-if (empty($content)) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Le champ "content" est requis.']);
-    exit;
-}
+$message_param = $_POST['message_url'] ?? $_POST['message_id'] ?? null;
 
 try {
     $payload = [
-        'content'    => date('d/m/Y, H:i:s') . ' - ' . $content,
-        'username'   => $name,
+        'content' => null,
+        'username' => $type,
         'avatar_url' => 'https://cdn-avatars.huggingface.co/v1/production/uploads/68bd85e15271b9ac99cb2963/cEyVuEJrSO62SPVv8Zytb.png',
-        "flags" => 4096,
+        'embeds' => [
+            [
+                'title' => "Epoch {$epoch}",
+                'color' => 559629,
+                'fields' => [
+                    [
+                        'name' => 'Completion :',
+                        'value' => $completion
+                    ],
+                    [
+                        'name' => 'Loss instantanée :',
+                        'value' => $loss
+                    ],
+                    [
+                        'name' => 'Token par seconde',
+                        'value' => $tps
+                    ],
+                    [
+                        'name' => 'ETA fin d\'epoch :',
+                        'value' => $eta
+                    ]
+                ],
+                'timestamp' => date(DATE_ATOM)
+            ]
+        ]
     ];
 
-    $ch = curl_init($config['webhook_url']);
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
+    $webhook_url = $config['webhook_url'];
+    $is_edit = false;
+
+    if (!empty($message_param)) {
+        $message_id = null;
+        if (filter_var($message_param, FILTER_VALIDATE_URL)) {
+            $path_parts = explode('/', parse_url($message_param, PHP_URL_PATH));
+            $message_id = end($path_parts);
+        } else {
+            $message_id = $message_param;
+        }
+
+        if (!empty($message_id)) {
+            $webhook_url = rtrim($webhook_url, '/') . '/messages/' . $message_id;
+            $is_edit = true;
+        }
+    }
+
+    if (!$is_edit) {
+        $webhook_url .= (parse_url($webhook_url, PHP_URL_QUERY) ? '&' : '?') . 'wait=true';
+    }
+
+    $ch = curl_init($webhook_url);
+    $curl_options = [
         CURLOPT_POSTFIELDS     => json_encode($payload),
         CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 5
-    ]);
+    ];
+
+    if ($is_edit) {
+        $curl_options[CURLOPT_CUSTOMREQUEST] = 'PATCH';
+    } else {
+        $curl_options[CURLOPT_POST] = true;
+    }
+
+    curl_setopt_array($ch, $curl_options);
 
     $response = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    if ($http_code === 204 || $http_code === 200) {
+    if ($http_code === 200) {
+        $discord_data = json_decode($response, true);
+
+        $guild_id   = $discord_data['guild_id'] ?? '@me';
+        $channel_id = $discord_data['channel_id'] ?? null;
+        $message_id = $discord_data['id'] ?? null;
+
+        $message_url = ($channel_id && $message_id) 
+            ? "https://discord.com/channels/{$guild_id}/{$channel_id}/{$message_id}"
+            : null;
+
         http_response_code(200);
-        echo json_encode(['status' => 'success', 'message' => 'Message envoye']);
+        echo json_encode([
+            'status'      => 'success',
+            'action'      => $is_edit ? 'edited' : 'created',
+            'message'     => $is_edit ? 'Message mis à jour' : 'Message envoyé',
+            'message_url' => $message_url
+        ]);
     } else {
         http_response_code(502);
-        echo json_encode(['error' => 'Echec de l\'envoi au webhook', 'code' => $http_code]);
+        echo json_encode([
+            'error'     => 'Echec de l\'opération auprès du webhook Discord',
+            'code'      => $http_code,
+            'response'  => json_decode($response, true) ?? $response
+        ]);
     }
 } catch (Exception $e) {
     http_response_code(500);
