@@ -5,7 +5,7 @@ $config = require __DIR__ . '/config.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    echo json_encode(['error' => 'Méthode non autorisée. POST requis.']);
+    echo json_encode(['error' => 'Methode non autorisee. POST requis.']);
     exit;
 }
 
@@ -16,7 +16,7 @@ $valid_keys = $config['api_keys'] ?? [];
 
 if (!$api_key || !is_array($valid_keys) || !in_array($api_key, $valid_keys, true)) {
     http_response_code(401);
-    echo json_encode(['error' => 'Clé API invalide ou manquante.']);
+    echo json_encode(['error' => 'Cle API invalide ou manquante.']);
     exit;
 }
 
@@ -35,7 +35,7 @@ if (($current_time - $rate_data['start_time']) > $config['rate_limit_time']) {
 
 if ($rate_data['count'] >= $config['rate_limit_max']) {
     http_response_code(429);
-    echo json_encode(['error' => 'Rate limit dépassé. Réessayez plus tard.']);
+    echo json_encode(['error' => 'Rate limit depasse. Reessayez plus tard.']);
     exit;
 }
 
@@ -75,10 +75,10 @@ try {
 
     if ($http_code === 204 || $http_code === 200) {
         http_response_code(200);
-        echo json_encode(['status' => 'success', 'message' => 'Message envoyé']);
+        echo json_encode(['status' => 'success', 'message' => 'Message envoye']);
     } else {
         http_response_code(502);
-        echo json_encode(['error' => 'Échec de l\'envoi au webhook', 'code' => $http_code]);
+        echo json_encode(['error' => 'Echec de l\'envoi au webhook', 'code' => $http_code]);
     }
 } catch (Exception $e) {
     http_response_code(500);

@@ -1,0 +1,24 @@
+name: upload
+
+on: 
+  push:
+  workflow_dispatch:
+
+jobs:
+  FTP-Deploy-Action:
+    name: Deploy website
+    runs-on: ubuntu-latest
+    steps:
+      - name: Recuper le code récent
+        uses: actions/checkout@v3
+
+      - name: Install Git
+        run: sudo apt -y install git
+
+      - name: Synchroniser les fichier
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: 566pq.ftp.infomaniak.com
+          username: 566pq_marvideo
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: lyseai-api/
