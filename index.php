@@ -58,7 +58,7 @@ try {
         'avatar_url' => 'https://cdn-avatars.huggingface.co/v1/production/uploads/68bd85e15271b9ac99cb2963/cEyVuEJrSO62SPVv8Zytb.png',
         'embeds' => [
             [
-                'title' => "Epoch {$epoch}",
+                'title' => "{$type} (Epoch {$epoch})",
                 'color' => 559629,
                 'fields' => [
                     [
