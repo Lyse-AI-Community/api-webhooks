@@ -57,7 +57,8 @@ try {
     $payload = [
         'content'    => date('d/m/Y, H:i:s') . ' - ' . $content,
         'username'   => $name,
-        'avatar_url' => 'https://cdn-avatars.huggingface.co/v1/production/uploads/68bd85e15271b9ac99cb2963/cEyVuEJrSO62SPVv8Zytb.png'
+        'avatar_url' => 'https://cdn-avatars.huggingface.co/v1/production/uploads/68bd85e15271b9ac99cb2963/cEyVuEJrSO62SPVv8Zytb.png',
+        "flags" => 4096,
     ];
 
     $ch = curl_init($config['webhook_url']);
