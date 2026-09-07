@@ -41,34 +41,37 @@ if ($count_raw === 0) {
 
 usort($points_raw, fn($a, $b) => $a['time'] <=> $b['time']);
 
-$max_display_points = 120;
+$points_processed = [];
+$bucket = [];
+$bucket_start = $points_raw[0]['time'];
+$interval = 30;
 
-if ($count_raw > $max_display_points) {
-    $points_processed = [];
-    $chunk_size = ceil($count_raw / $max_display_points);
-    $chunks = array_chunk($points_raw, $chunk_size);
-
-    foreach ($chunks as $chunk) {
-        $avg_time = array_sum(array_column($chunk, 'time')) / count($chunk);
-        $avg_loss = array_sum(array_column($chunk, 'loss')) / count($chunk);
-        $points_processed[] = [
-            'time' => (int)$avg_time,
-            'loss' => $avg_loss
-        ];
+foreach ($points_raw as $p) {
+    if (($p['time'] - $bucket_start) < $interval) {
+        $bucket[] = $p;
+    } else {
+        if (!empty($bucket)) {
+            $avg_time = array_sum(array_column($bucket, 'time')) / count($bucket);
+            $avg_loss = array_sum(array_column($bucket, 'loss')) / count($bucket);
+            $points_processed[] = ['time' => (int)$avg_time, 'loss' => $avg_loss];
+        }
+        $bucket = [$p];
+        $bucket_start = $p['time'];
     }
-} else {
-    $points_processed = $points_raw;
 }
-
-$count = count($points_processed);
+if (!empty($bucket)) {
+    $avg_time = array_sum(array_column($bucket, 'time')) / count($bucket);
+    $avg_loss = array_sum(array_column($bucket, 'loss')) / count($bucket);
+    $points_processed[] = ['time' => (int)$avg_time, 'loss' => $avg_loss];
+}
 
 $min_time = $points_raw[0]['time'];
 $max_time = end($points_raw)['time'];
 $time_range = $max_time - $min_time;
 
-$losses = array_column($points_raw, 'loss');
-$min_loss = min($losses);
-$max_loss = max($losses);
+$all_losses = array_column($points_raw, 'loss');
+$min_loss = min($all_losses);
+$max_loss = max($all_losses);
 
 if ($max_loss === $min_loss) {
     $max_loss += 0.0001;
@@ -135,23 +138,15 @@ foreach ($points_processed as $p) {
     }
 }
 
-imagesetthickness($img, 3);
+imagesetthickness($img, 2);
+$max_gap = 180; // Interrompt le tracé s'il y a un trou de plus de 3 min (180s) sans données
+
 for ($i = 0; $i < count($points) - 1; $i++) {
-    imageline(
-        $img,
-        $points[$i]['x'],
-        $points[$i]['y'],
-        $points[$i + 1]['x'],
-        $points[$i + 1]['y'],
-        $line_color
-    );
-}
+    $p1 = $points[$i];
+    $p2 = $points[$i + 1];
 
-$show_dots = ($count <= 50);
-
-foreach ($points as $p) {
-    if ($show_dots) {
-        imagefilledellipse($img, $p['x'], $p['y'], 4, 4, $point_color);
+    if (($p2['time'] - $p1['time']) <= $max_gap) {
+        imageline($img, $p1['x'], $p1['y'], $p2['x'], $p2['y'], $line_color);
     }
 }
 
@@ -161,7 +156,7 @@ if ($min_point_coords) {
 
 $duration_min = round($time_range / 60);
 $info_str = "Duree: {$duration_min} min | Min loss: " . number_format($min_loss, 5);
-imagestring($img, 3, $width - $padding - 310, 15, $info_str, $text_color);
+imagestring($img, 3, $width - $padding - 280, 15, $info_str, $text_color);
 
 imagepng($img);
 imagedestroy($img);
