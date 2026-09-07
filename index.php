@@ -72,9 +72,57 @@ if (mb_stripos($title, 'Démarrage') !== false) {
         $records = [];
     }
     $records[] = $entry;
+    if (count($records) > 150) {
+        $records = compress_history($records, 20);
+    }
 }
 
 file_put_contents($data_file, json_encode($records, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+
+function compress_history(array $records, int $interval_seconds = 20): array {
+    if (empty($records)) return [];
+
+    $compressed = [];
+    $current_bucket = [];
+    $bucket_start_time = 0;
+
+    foreach ($records as $row) {
+        $time = strtotime($row['timestamp'] ?? 'now');
+
+        if ($bucket_start_time === 0) {
+            $bucket_start_time = $time;
+        }
+
+        if (($time - $bucket_start_time) >= $interval_seconds && !empty($current_bucket)) {
+            $compressed[] = aggregate_bucket($current_bucket);
+            $current_bucket = [];
+            $bucket_start_time = $time;
+        }
+
+        $current_bucket[] = $row;
+    }
+
+    if (!empty($current_bucket)) {
+        $compressed[] = aggregate_bucket($current_bucket);
+    }
+
+    return $compressed;
+}
+
+function aggregate_bucket(array $bucket): array {
+    $count = count($bucket);
+    if ($count === 1) return $bucket[0];
+
+    $sum_loss = 0;
+    foreach ($bucket as $item) {
+        $sum_loss += floatval(preg_replace('/[^0-9.]/', '', $item['loss'] ?? 0));
+    }
+
+    $last_item = end($bucket);
+    $last_item['loss'] = (string)round($sum_loss / $count, 6);
+
+    return $last_item;
+}
 
 try {
     $payload = [
@@ -83,7 +131,7 @@ try {
         'avatar_url' => 'https://cdn-avatars.huggingface.co/v1/production/uploads/68bd85e15271b9ac99cb2963/cEyVuEJrSO62SPVv8Zytb.png',
         'embeds' => [
             [
-                'title' => "{$type} (Epoch {$epoch})",
+                'title' => $title,
                 'color' => 559629,
                 'fields' => [
                     [
