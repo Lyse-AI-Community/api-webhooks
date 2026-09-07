@@ -53,13 +53,16 @@ $message_param = $_POST['message_url'] ?? $_POST['message_id'] ?? null;
 
 $data_file = __DIR__ . '/status.json';
 $title = "{$type} (Epoch {$epoch})";
+$now_timestamp = date(DATE_ATOM);
+
+$clean_loss = (float) preg_replace('/[^0-9.]/', '', $loss);
 
 $entry = [
-    'timestamp'  => date(DATE_ATOM),
+    'timestamp'  => $now_timestamp,
     'type'       => $type,
     'epoch'      => $epoch,
     'completion' => $completion,
-    'loss'       => $loss,
+    'loss'       => $clean_loss,
     'tps'        => $tps,
     'eta'        => $eta
 ];
@@ -71,15 +74,17 @@ if (mb_stripos($title, 'Démarrage') !== false) {
     if (!is_array($records)) {
         $records = [];
     }
+
     $records[] = $entry;
+
     if (count($records) > 150) {
-        $records = compress_history($records, 20);
+        $records = compress_history($records, 30);
     }
 }
 
 file_put_contents($data_file, json_encode($records, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
 
-function compress_history(array $records, int $interval_seconds = 20): array {
+function compress_history(array $records, int $interval_seconds = 30): array {
     if (empty($records)) return [];
 
     $compressed = [];
@@ -115,11 +120,11 @@ function aggregate_bucket(array $bucket): array {
 
     $sum_loss = 0;
     foreach ($bucket as $item) {
-        $sum_loss += floatval(preg_replace('/[^0-9.]/', '', $item['loss'] ?? 0));
+        $sum_loss += floatval($item['loss'] ?? 0);
     }
 
     $last_item = end($bucket);
-    $last_item['loss'] = (string)round($sum_loss / $count, 6);
+    $last_item['loss'] = round($sum_loss / $count, 6);
 
     return $last_item;
 }
