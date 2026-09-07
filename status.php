@@ -10,31 +10,52 @@ if (!file_exists($data_file)) {
 
 $records = json_decode(file_get_contents($data_file), true);
 
+$first_record = reset($records);
+$type = $first_record['type'] ?? 'Training';
+
 if (!is_array($records) || empty($records)) {
     render_error("Fichier status.json vide ou invalide");
     exit;
 }
 
-$losses = [];
-$labels = [];
-
+$points_raw = [];
 foreach ($records as $row) {
-    if (isset($row['loss'])) {
-        $val = floatval(preg_replace('/[^0-9.]/', '', $row['loss']));
-        $losses[] = $val;
-        $labels[] = $row['epoch'] ?? '';
+    if (isset($row['loss'], $row['timestamp'])) {
+        $loss_val = floatval(preg_replace('/[^0-9.]/', '', $row['loss']));
+        $time_val = strtotime($row['timestamp']);
+
+        if ($time_val !== false) {
+            $points_raw[] = [
+                'time' => $time_val,
+                'loss' => $loss_val
+            ];
+        }
     }
 }
 
-$count = count($losses);
+$count = count($points_raw);
 if ($count === 0) {
-    render_error("Aucune donnée de loss exploitable");
+    render_error("Aucune donnee de loss/temps exploitable");
     exit;
+}
+
+usort($points_raw, fn($a, $b) => $a['time'] <=> $b['time']);
+
+$min_time = $points_raw[0]['time'];
+$max_time = end($points_raw)['time'];
+$time_range = $max_time - $min_time;
+
+$losses = array_column($points_raw, 'loss');
+$min_loss = min($losses);
+$max_loss = max($losses);
+
+if ($max_loss === $min_loss) {
+    $max_loss += 0.0001;
 }
 
 $width  = 800;
 $height = 400;
-$padding = 50;
+$padding = 60;
 
 $img = imagecreatetruecolor($width, $height);
 
@@ -48,13 +69,6 @@ $min_color    = imagecolorallocate($img, 87, 242, 135);
 
 imagefilledrectangle($img, 0, 0, $width, $height, $bg_color);
 
-$min_loss = min($losses);
-$max_loss = max($losses);
-
-if ($max_loss === $min_loss) {
-    $max_loss += 1;
-}
-
 $chart_w = $width - (2 * $padding);
 $chart_h = $height - (2 * $padding);
 
@@ -64,42 +78,60 @@ for ($i = 0; $i <= $grid_steps; $i++) {
     imageline($img, $padding, (int)$y, $width - $padding, (int)$y, $grid_color);
 
     $val = $min_loss + ($i * ($max_loss - $min_loss) / $grid_steps);
-    $val_str = number_format($val, 4);
-    imagestring($img, 2, 5, (int)$y - 7, $val_str, $sub_color);
+    imagestring($img, 2, 5, (int)$y - 7, number_format($val, 4), $sub_color);
 }
 
-imagestring($img, 5, $padding, 15, "Graphique de Loss - Entrainement", $text_color);
+$x_steps = 5;
+for ($i = 0; $i <= $x_steps; $i++) {
+    $x = $padding + ($i * ($chart_w / $x_steps));
+    imageline($img, (int)$x, $padding, (int)$x, $height - $padding, $grid_color);
+
+    $t_label = $min_time + ($i * ($time_range / $x_steps));
+
+    $format = ($time_range > 43200) ? 'H:i' : 'H:i:s';
+    $time_str = date($format, (int)$t_label);
+
+    imagestring($img, 2, (int)$x - 20, $height - $padding + 10, $time_str, $sub_color);
+}
+
+$title = "Evolution de la Loss - " . $type;
+imagestring($img, 5, $padding, 15, $title, $text_color);
 
 $points = [];
-for ($i = 0; $i < $count; $i++) {
-    $x = ($count > 1) 
-        ? $padding + ($i * ($chart_w / ($count - 1))) 
+foreach ($points_raw as $p) {
+    $x = ($time_range > 0)
+        ? $padding + (($p['time'] - $min_time) / $time_range * $chart_w)
         : $padding + ($chart_w / 2);
 
-    $y = $height - $padding - (($losses[$i] - $min_loss) / ($max_loss - $min_loss) * $chart_h);
+    $y = $height - $padding - (($p['loss'] - $min_loss) / ($max_loss - $min_loss) * $chart_h);
 
-    $points[] = ['x' => (int)$x, 'y' => (int)$y, 'val' => $losses[$i], 'epoch' => $labels[$i]];
+    $points[] = [
+        'x'    => (int)$x,
+        'y'    => (int)$y,
+        'loss' => $p['loss']
+    ];
 }
 
-for ($i = 0; $i < $count - 1; $i++) {
-    imagesetthickness($img, 3);
-    imageline($img, $points[$i]['x'], $points[$i]['y'], $points[$i + 1]['x'], $points[$i + 1]['y'], $line_color);
+imagesetthickness($img, 3);
+for ($i = 0; $i < count($points) - 1; $i++) {
+    imageline(
+        $img,
+        $points[$i]['x'],
+        $points[$i]['y'],
+        $points[$i + 1]['x'],
+        $points[$i + 1]['y'],
+        $line_color
+    );
 }
 
-$step_label = max(1, (int)ceil($count / 10));
-
-foreach ($points as $idx => $p) {
-    $color = ($p['val'] === $min_loss) ? $min_color : $point_color;
-    imagefilledellipse($img, $p['x'], $p['y'], 8, 8, $color);
-
-    if ($idx % $step_label === 0 || $idx === $count - 1) {
-        imagestring($img, 2, $p['x'] - 10, $height - $padding + 10, "E" . $p['epoch'], $sub_color);
-    }
+foreach ($points as $p) {
+    $color = ($p['loss'] === $min_loss) ? $min_color : $point_color;
+    imagefilledellipse($img, $p['x'], $p['y'], 6, 6, $color);
 }
 
-$last_val = end($losses);
-$last_str = "Derniere loss: " . number_format($last_val, 5);
-imagestring($img, 3, $width - $padding - 180, 15, $last_str, $text_color);
+$duration_min = round($time_range / 60);
+$info_str = "Duree: {$duration_min} min | Min loss: " . number_format($min_loss, 5);
+imagestring($img, 3, $width - $padding - 260, 15, $info_str, $text_color);
 
 imagepng($img);
 imagedestroy($img);
