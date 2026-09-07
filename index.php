@@ -42,7 +42,7 @@ if ($rate_data['count'] >= $config['rate_limit_max']) {
 $rate_data['count']++;
 file_put_contents($cache_file, json_encode($rate_data));
 
-$type      = $_POST['type'] ?? 'Training';
+$type       = $_POST['type'] ?? 'Training';
 $epoch      = $_POST['epoch'] ?? '0';
 $completion = $_POST['completion'] ?? '0/0 (0%)';
 $loss       = $_POST['loss'] ?? '1000000';
@@ -50,6 +50,31 @@ $tps        = $_POST['tps'] ?? '0 tokens/s';
 $eta        = $_POST['eta'] ?? '0 h';
 
 $message_param = $_POST['message_url'] ?? $_POST['message_id'] ?? null;
+
+$data_file = __DIR__ . '/status.json';
+$title = "{$type} (Epoch {$epoch})";
+
+$entry = [
+    'timestamp'  => date(DATE_ATOM),
+    'type'       => $type,
+    'epoch'      => $epoch,
+    'completion' => $completion,
+    'loss'       => $loss,
+    'tps'        => $tps,
+    'eta'        => $eta
+];
+
+if (mb_stripos($title, 'Démarrage') !== false) {
+    $records = [$entry];
+} else {
+    $records = file_exists($data_file) ? json_decode(file_get_contents($data_file), true) : [];
+    if (!is_array($records)) {
+        $records = [];
+    }
+    $records[] = $entry;
+}
+
+file_put_contents($data_file, json_encode($records, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
 
 try {
     $payload = [
