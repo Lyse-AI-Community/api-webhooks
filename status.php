@@ -41,7 +41,7 @@ if ($count_raw === 0) {
 
 usort($points_raw, fn($a, $b) => $a['time'] <=> $b['time']);
 
-$max_display_points = 120;
+$max_display_points = 200;
 
 if ($count_raw > $max_display_points) {
     $points_processed = [];
@@ -110,7 +110,7 @@ for ($i = 0; $i <= $x_steps; $i++) {
     $t_label = $min_time + ($i * ($time_range / $x_steps));
     $format = ($time_range > 86400) ? 'd/m H:i' : (($time_range > 3600) ? 'H:i' : 'H:i:s');
     $time_str = date($format, (int)$t_label);
-    
+
     imagestring($img, 2, (int)$x - 22, $height - $padding + 12, $time_str, $sub_color);
 }
 
