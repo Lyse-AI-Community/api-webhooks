@@ -53,7 +53,7 @@ $message_param = $_POST['message_url'] ?? $_POST['message_id'] ?? null;
 
 $data_file = __DIR__ . '/status.json';
 $title = "{$type} (Epoch {$epoch})";
-$now_timestamp = date(DATE_ATOM);
+$now_timestamp = time();
 
 $clean_loss = (float) preg_replace('/[^0-9.]/', '', $loss);
 
@@ -77,8 +77,17 @@ if (mb_stripos($title, 'Démarrage') !== false) {
 
     $records[] = $entry;
 
-    if (count($records) > 150) {
-        $records = compress_history($records, 30);
+    if (count($records) > 1000) {
+        $recent = array_slice($records, -300);
+        $older  = array_slice($records, 0, -300);
+
+        $sampled_older = [];
+        foreach ($older as $idx => $row) {
+            if ($idx % 3 === 0) {
+                $sampled_older[] = $row;
+            }
+        }
+        $records = array_merge($sampled_older, $recent);
     }
 }
 

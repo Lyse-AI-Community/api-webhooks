@@ -26,9 +26,9 @@ $points_raw = [];
 foreach ($records as $row) {
     if (isset($row['loss'], $row['timestamp'])) {
         $loss_val = floatval($row['loss']);
-        $time_val = strtotime($row['timestamp']);
+        $time_val = is_numeric($row['timestamp']) ? (int)$row['timestamp'] : strtotime($row['timestamp']);
 
-        if ($time_val !== false && $loss_val > 0) {
+        if ($time_val > 0 && $loss_val > 0) {
             $points_raw[] = [
                 'time' => $time_val,
                 'loss' => $loss_val
@@ -47,7 +47,7 @@ usort($points_raw, fn($a, $b) => $a['time'] <=> $b['time']);
 $points_processed = [];
 $bucket = [];
 $bucket_start = $points_raw[0]['time'];
-$interval = 30;
+$interval = 15;
 
 foreach ($points_raw as $p) {
     if (($p['time'] - $bucket_start) < $interval) {
@@ -113,8 +113,8 @@ for ($i = 0; $i <= $x_steps; $i++) {
     imageline($img, (int)$x, $padding, (int)$x, $height - $padding, $grid_color);
 
     $t_label = $min_time + ($i * ($time_range / $x_steps));
-    $format = ($time_range > 86400) ? 'd/m H:i' : 'H:i';
-    imagestring($img, 2, (int)$x - 18, $height - $padding + 12, date($format, (int)$t_label), $sub_color);
+    $format = ($time_range > 86400) ? 'd/m H:i' : 'H:i:s';
+    imagestring($img, 2, (int)$x - 22, $height - $padding + 12, date($format, (int)$t_label), $sub_color);
 }
 
 imagestring($img, 5, $padding, 15, "Evolution de la Loss - " . $type, $text_color);
@@ -135,7 +135,7 @@ foreach ($points_processed as $p) {
 }
 
 imagesetthickness($img, 2);
-$max_gap = 100;
+$max_gap = 180;
 
 for ($i = 0; $i < count($points) - 1; $i++) {
     $p1 = $points[$i];
