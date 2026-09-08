@@ -22,7 +22,7 @@ $points_raw = [];
 foreach ($records as $row) {
     if (isset($row['loss'], $row['timestamp'])) {
         $loss_val = floatval(preg_replace('/[^0-9.]/', '', $row['loss']));
-        $time_val = strtotime($row['timestamp']);
+        $time_val = is_numeric($row['timestamp']) ? (int)$row['timestamp'] : strtotime($row['timestamp']);
 
         if ($time_val !== false) {
             $points_raw[] = [
