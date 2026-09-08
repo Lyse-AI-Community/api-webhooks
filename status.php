@@ -1,17 +1,17 @@
 <?php
 header('Content-Type: image/png');
 
-$data_file = __DIR__ . '/data.json';
+$data_file = __DIR__ . '/status.json';
 
 if (!file_exists($data_file)) {
-    render_error("Aucune donnee (data.json introuvable)");
+    render_error("Aucune donnee (status.json introuvable)");
     exit;
 }
 
 $records = json_decode(file_get_contents($data_file), true);
 
 if (!is_array($records) || empty($records)) {
-    render_error("Fichier data.json vide ou invalide");
+    render_error("Fichier status.json vide ou invalide");
     exit;
 }
 
