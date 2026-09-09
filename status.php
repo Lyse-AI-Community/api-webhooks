@@ -41,6 +41,19 @@ if ($count_raw === 0) {
 
 usort($points_raw, fn($a, $b) => $a['time'] <=> $b['time']);
 
+$latest_time = end($points_raw)['time'];
+$cutoff_time = $latest_time - (3 * 3600);
+
+$points_raw = array_values(array_filter($points_raw, function ($p) use ($cutoff_time) {
+    return $p['time'] >= $cutoff_time;
+}));
+
+$count_raw = count($points_raw);
+if ($count_raw === 0) {
+    render_error("Aucune donnee dans les 3 dernieres heures");
+    exit;
+}
+
 $max_display_points = 200;
 
 if ($count_raw > $max_display_points) {
