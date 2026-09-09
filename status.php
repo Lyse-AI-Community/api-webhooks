@@ -18,35 +18,39 @@ if (!is_array($records) || empty($records)) {
 $first_record = reset($records);
 $type = $first_record['type'] ?? 'Training';
 
-$points_raw = [];
+$max_timestamp = 0;
 foreach ($records as $row) {
-    if (isset($row['loss'], $row['timestamp'])) {
-        $loss_val = floatval(preg_replace('/[^0-9.]/', '', $row['loss']));
-        $time_val = is_numeric($row['timestamp']) ? (int)$row['timestamp'] : strtotime($row['timestamp']);
-
-        if ($time_val !== false) {
-            $points_raw[] = [
-                'time' => $time_val,
-                'loss' => $loss_val
-            ];
+    if (isset($row['timestamp'])) {
+        $t = is_numeric($row['timestamp']) ? (int)$row['timestamp'] : strtotime($row['timestamp']);
+        if ($t > $max_timestamp) {
+            $max_timestamp = $t;
         }
     }
 }
 
-$count_raw = count($points_raw);
-if ($count_raw === 0) {
-    render_error("Aucune donnee de loss/temps exploitable");
+if ($max_timestamp === 0) {
+    render_error("Aucune donnee de temps exploitable");
     exit;
 }
 
-usort($points_raw, fn($a, $b) => $a['time'] <=> $b['time']);
+$cutoff_time = $max_timestamp - 10800;
 
-$latest_time = end($points_raw)['time'];
-$cutoff_time = $latest_time - (3 * 3600);
+$points_raw = [];
+$min_loss = PHP_FLOAT_MAX;
+$max_loss = -PHP_FLOAT_MAX;
 
-$points_raw = array_values(array_filter($points_raw, function ($p) use ($cutoff_time) {
-    return $p['time'] >= $cutoff_time;
-}));
+foreach ($records as $row) {
+    if (isset($row['loss'], $row['timestamp'])) {
+        $t = is_numeric($row['timestamp']) ? (int)$row['timestamp'] : strtotime($row['timestamp']);
+        if ($t >= $cutoff_time) {
+            $loss = (float)preg_replace('/[^0-9.]/', '', $row['loss']);
+            $points_raw[] = ['time' => $t, 'loss' => $loss];
+
+            if ($loss < $min_loss) $min_loss = $loss;
+            if ($loss > $max_loss) $max_loss = $loss;
+        }
+    }
+}
 
 $count_raw = count($points_raw);
 if ($count_raw === 0) {
@@ -54,19 +58,35 @@ if ($count_raw === 0) {
     exit;
 }
 
-$max_display_points = 200;
+usort($points_raw, fn($a, $b) => $a['time'] <=> $b['time']);
 
+$min_time = $points_raw[0]['time'];
+$max_time = $points_raw[$count_raw - 1]['time'];
+$time_range = $max_time - $min_time;
+
+if ($max_loss === $min_loss) {
+    $max_loss += 0.0001;
+}
+
+$max_display_points = 200;
 if ($count_raw > $max_display_points) {
     $points_processed = [];
-    $chunk_size = ceil($count_raw / $max_display_points);
-    $chunks = array_chunk($points_raw, $chunk_size);
+    $chunk_size = (int)ceil($count_raw / $max_display_points);
 
-    foreach ($chunks as $chunk) {
-        $avg_time = array_sum(array_column($chunk, 'time')) / count($chunk);
-        $avg_loss = array_sum(array_column($chunk, 'loss')) / count($chunk);
+    for ($i = 0; $i < $count_raw; $i += $chunk_size) {
+        $sum_time = 0;
+        $sum_loss = 0;
+        $actual_chunk_count = 0;
+
+        for ($j = $i; $j < $i + $chunk_size && $j < $count_raw; $j++) {
+            $sum_time += $points_raw[$j]['time'];
+            $sum_loss += $points_raw[$j]['loss'];
+            $actual_chunk_count++;
+        }
+
         $points_processed[] = [
-            'time' => (int)$avg_time,
-            'loss' => $avg_loss
+            'time' => (int)($sum_time / $actual_chunk_count),
+            'loss' => $sum_loss / $actual_chunk_count
         ];
     }
 } else {
@@ -75,21 +95,11 @@ if ($count_raw > $max_display_points) {
 
 $count = count($points_processed);
 
-$min_time   = $points_raw[0]['time'];
-$max_time   = end($points_raw)['time'];
-$time_range = $max_time - $min_time;
-
-$all_losses = array_column($points_raw, 'loss');
-$min_loss   = min($all_losses);
-$max_loss   = max($all_losses);
-
-if ($max_loss === $min_loss) {
-    $max_loss += 0.0001;
-}
-
 $width   = 900;
 $height  = 450;
 $padding = 65;
+$chart_w = $width - (2 * $padding);
+$chart_h = $height - (2 * $padding);
 
 $img = imagecreatetruecolor($width, $height);
 
@@ -103,78 +113,71 @@ $min_color   = imagecolorallocate($img, 87, 242, 135);
 
 imagefilledrectangle($img, 0, 0, $width, $height, $bg_color);
 
-$chart_w = $width - (2 * $padding);
-$chart_h = $height - (2 * $padding);
-
 $grid_steps = 5;
-for ($i = 0; $i <= $grid_steps; $i++) {
-    $y = $height - $padding - ($i * ($chart_h / $grid_steps));
-    imageline($img, $padding, (int)$y, $width - $padding, (int)$y, $grid_color);
+$loss_step = ($max_loss - $min_loss) / $grid_steps;
+$y_step = $chart_h / $grid_steps;
 
-    $val = $min_loss + ($i * ($max_loss - $min_loss) / $grid_steps);
-    imagestring($img, 2, 5, (int)$y - 7, number_format($val, 4), $sub_color);
+for ($i = 0; $i <= $grid_steps; $i++) {
+    $y = (int)($height - $padding - ($i * $y_step));
+    imageline($img, $padding, $y, $width - $padding, $y, $grid_color);
+
+    $val = $min_loss + ($i * $loss_step);
+    imagestring($img, 2, 5, $y - 7, number_format($val, 4), $sub_color);
 }
 
 $x_steps = 6;
+$x_step = $chart_w / $x_steps;
+$time_step = $time_range / $x_steps;
+$format = ($time_range > 86400) ? 'd/m H:i' : (($time_range > 3600) ? 'H:i' : 'H:i:s');
+
 for ($i = 0; $i <= $x_steps; $i++) {
-    $x = $padding + ($i * ($chart_w / $x_steps));
-    imageline($img, (int)$x, $padding, (int)$x, $height - $padding, $grid_color);
+    $x = (int)($padding + ($i * $x_step));
+    imageline($img, $x, $padding, $x, $height - $padding, $grid_color);
 
-    $t_label = $min_time + ($i * ($time_range / $x_steps));
-    $format = ($time_range > 86400) ? 'd/m H:i' : (($time_range > 3600) ? 'H:i' : 'H:i:s');
-    $time_str = date($format, (int)$t_label);
-
-    imagestring($img, 2, (int)$x - 22, $height - $padding + 12, $time_str, $sub_color);
+    $t_label = $min_time + ($i * $time_step);
+    imagestring($img, 2, $x - 22, $height - $padding + 12, date($format, (int)$t_label), $sub_color);
 }
 
 $title = "Evolution de la Loss - " . $type;
 imagestring($img, 5, $padding, 15, $title, $text_color);
 
-$points = [];
-$min_point_coords = null;
-
-foreach ($points_processed as $p) {
-    $x = ($time_range > 0)
-        ? $padding + (($p['time'] - $min_time) / $time_range * $chart_w)
-        : $padding + ($chart_w / 2);
-
-    $y = $height - $padding - (($p['loss'] - $min_loss) / ($max_loss - $min_loss) * $chart_h);
-
-    $pt = ['x' => (int)$x, 'y' => (int)$y, 'loss' => $p['loss']];
-    $points[] = $pt;
-
-    if ($p['loss'] == $min_loss && !$min_point_coords) {
-        $min_point_coords = $pt;
-    }
-}
-
-imagesetthickness($img, 2);
-for ($i = 0; $i < count($points) - 1; $i++) {
-    imageline(
-        $img,
-        $points[$i]['x'],
-        $points[$i]['y'],
-        $points[$i + 1]['x'],
-        $points[$i + 1]['y'],
-        $line_color
-    );
-}
-
-$show_dots = ($count <= 50);
-
-foreach ($points as $p) {
-    if ($show_dots) {
-        imagefilledellipse($img, $p['x'], $p['y'], 4, 4, $point_color);
-    }
-}
-
-if ($min_point_coords) {
-    imagefilledellipse($img, $min_point_coords['x'], $min_point_coords['y'], 8, 8, $min_color);
-}
-
 $duration_min = round($time_range / 60);
 $info_str = "Points: {$count_raw} | Duree: {$duration_min}m | Min: " . number_format($min_loss, 5);
 imagestring($img, 3, $width - $padding - 310, 15, $info_str, $text_color);
+
+$scale_x = $time_range > 0 ? $chart_w / $time_range : 0;
+$scale_y = $chart_h / ($max_loss - $min_loss);
+
+$prev_x = null;
+$prev_y = null;
+$min_coords = null;
+$show_dots = ($count <= 50);
+
+imagesetthickness($img, 2);
+
+foreach ($points_processed as $p) {
+    $x = (int)($time_range > 0 ? $padding + (($p['time'] - $min_time) * $scale_x) : $padding + ($chart_w / 2));
+    $y = (int)($height - $padding - (($p['loss'] - $min_loss) * $scale_y));
+
+    if ($prev_x !== null) {
+        imageline($img, $prev_x, $prev_y, $x, $y, $line_color);
+    }
+
+    if ($show_dots) {
+        imagefilledellipse($img, $x, $y, 4, 4, $point_color);
+    }
+
+    if ($min_coords === null && $p['loss'] == $min_loss) {
+        $min_coords = [$x, $y];
+    }
+
+    $prev_x = $x;
+    $prev_y = $y;
+}
+
+if ($min_coords) {
+    imagefilledellipse($img, $min_coords[0], $min_coords[1], 8, 8, $min_color);
+}
 
 imagepng($img);
 imagedestroy($img);
