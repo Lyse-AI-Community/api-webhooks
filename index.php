@@ -67,7 +67,7 @@ $entry = [
     'eta'        => $eta
 ];
 
-if (mb_stripos($title, 'Démarrage') !== false) {
+if (mb_stripos($title, 'Demarrage') !== false) {
     $records = [$entry];
 } else {
     $records = file_exists($data_file) ? json_decode(file_get_contents($data_file), true) : [];
