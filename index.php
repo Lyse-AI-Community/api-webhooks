@@ -68,7 +68,7 @@ $entry = [
 ];
 
 if (mb_stripos($title, 'Demarrage') !== false) {
-    $records = [$entry];
+    $records = [];
 } else {
     $records = file_exists($data_file) ? json_decode(file_get_contents($data_file), true) : [];
     if (!is_array($records)) {
