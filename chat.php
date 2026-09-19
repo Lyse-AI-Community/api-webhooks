@@ -7,7 +7,7 @@ header("Cache-Control: no-cache");
 header("Connection: keep-alive");
 
 header(
-    "Access-Control-Allow-Origin: http://localhost:4321/"
+    "Access-Control-Allow-Origin: http://localhost:4321"
 );
 header(
     "Access-Control-Allow-Headers: Content-Type"
