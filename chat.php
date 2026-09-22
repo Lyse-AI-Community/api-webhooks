@@ -99,7 +99,7 @@ if (!$apiKey) {
 }
 
 $payload = json_encode([
-    'model' => 'openrouter.openrouter/free',
+    'model' => '###openrouter.openrouter/free###',
     'messages' => $messages,
     'stream' => true,
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
