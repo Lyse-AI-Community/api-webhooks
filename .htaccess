@@ -7,3 +7,9 @@
         Deny from all
     </IfModule>
 </FilesMatch>
+<IfModule mod_deflate.c>
+    SetEnvIfNoCase Request_URI "\.php$" no-gzip dont-vary
+</IfModule>
+<IfModule mod_php.c>
+    php_flag zlib.output_compression Off
+</IfModule>
