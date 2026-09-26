@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 $allowedOrigins = [
     'http://localhost:4321',
-    'https://marvideo2009.github.io'
+    'https://sparkslyse-community.github.io'
 ];
 
 if (isset($_SERVER['HTTP_ORIGIN'])) {
