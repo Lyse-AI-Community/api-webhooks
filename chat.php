@@ -56,6 +56,10 @@ ini_set('implicit_flush', '1');
 
 ob_implicit_flush(true);
 
+echo ": " . str_repeat(' ', 4096) . "\n\n";
+if (function_exists('ob_flush')) { @ob_flush(); }
+flush();
+
 // --- MODE MAINTENANCE ---
 if (!empty($config['maintenance_mode'])) {
     $placeholderText = "Le service est actuellement en maintenance pour amélioration. Veuillez réessayer plus tard.";
