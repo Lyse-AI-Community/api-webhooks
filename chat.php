@@ -34,6 +34,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+// Chargement de la config au début
+$config = require __DIR__ . '/config.php';
+
 header('Content-Type: text/event-stream; charset=utf-8');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 header('Pragma: no-cache');
@@ -52,6 +55,41 @@ ini_set('zlib.output_compression', '0');
 ini_set('implicit_flush', '1');
 
 ob_implicit_flush(true);
+
+// --- MODE MAINTENANCE ---
+if (!empty($config['maintenance_mode'])) {
+    $placeholderText = "Le service est actuellement en maintenance pour amélioration. Veuillez réessayer plus tard.";
+    
+    // Découpage du texte en mots pour simuler la génération de l'IA
+    $words = explode(' ', $placeholderText);
+    
+    foreach ($words as $index => $word) {
+        $chunk = ($index === 0) ? $word : ' ' . $word;
+        
+        $payload = [
+            'choices' => [
+                [
+                    'delta' => [
+                        'content' => $chunk
+                    ],
+                    'finish_reason' => null
+                ]
+            ]
+        ];
+        
+        echo "data: " . json_encode($payload, JSON_UNESCAPED_UNICODE) . "\n\n";
+        if (function_exists('ob_flush')) { @ob_flush(); }
+        flush();
+        
+        usleep(80000); // Pause de 80ms entre chaque mot
+    }
+    
+    // Signal de fin de stream SSE
+    echo "data: [DONE]\n\n";
+    if (function_exists('ob_flush')) { @ob_flush(); }
+    flush();
+    exit;
+}
 
 $input = json_decode(
     file_get_contents('php://input'),
@@ -83,9 +121,7 @@ if (!is_array($messages)) {
 }
 
 $openWebUIUrl = 'https://openwebui.marvideo.fr/api/chat/completions';
-$config = require __DIR__ . '/config.php';
-
-$apiKey = $config['openwebui_api_key'];
+$apiKey = $config['openwebui_api_key'] ?? null;
 
 if (!$apiKey) {
     http_response_code(500);
