@@ -7,6 +7,13 @@
         Deny from all
     </IfModule>
 </FilesMatch>
+<IfModule mod_headers.c>
+    <Files "status.json">
+        Header set Access-Control-Allow-Origin "https://marvideo2009.github.io"
+        Header set Access-Control-Allow-Methods "POST, OPTIONS"
+        Header set Access-Control-Allow-Headers "Content-Type, Authorization"
+    </Files>
+</IfModule>
 <IfModule mod_deflate.c>
     SetEnvIfNoCase Request_URI "\.php$" no-gzip dont-vary
 </IfModule>
