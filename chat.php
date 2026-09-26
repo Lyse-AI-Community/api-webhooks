@@ -51,10 +51,11 @@ while (ob_get_level() > 0) {
 }
 
 ini_set('output_buffering', 'off');
-ini_set('zlib.output_compression', '0');
+ini_set('zlib.output_compression', 'Off');
 ini_set('implicit_flush', '1');
 
 ob_implicit_flush(true);
+implicit_flush(true);
 
 // --- MODE MAINTENANCE ---
 if (!empty($config['maintenance_mode'])) {
@@ -154,7 +155,7 @@ curl_setopt_array($ch, [
 
     CURLOPT_POSTFIELDS => $payload,
     CURLOPT_RETURNTRANSFER => false,
-    CURLOPT_BUFFERSIZE => 1,
+    CURLOPT_TCP_NODELAY => 1,
 
     CURLOPT_WRITEFUNCTION => function (
         $curl,
