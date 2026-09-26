@@ -55,7 +55,6 @@ ini_set('zlib.output_compression', 'Off');
 ini_set('implicit_flush', '1');
 
 ob_implicit_flush(true);
-implicit_flush(true);
 
 // --- MODE MAINTENANCE ---
 if (!empty($config['maintenance_mode'])) {
