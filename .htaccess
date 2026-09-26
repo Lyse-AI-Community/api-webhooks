@@ -9,8 +9,8 @@
 </FilesMatch>
 <IfModule mod_headers.c>
     <Files "status.json">
-        Header set Access-Control-Allow-Origin "https://marvideo2009.github.io"
-        Header set Access-Control-Allow-Methods "POST, OPTIONS"
+        Header set Access-Control-Allow-Origin "*"
+        Header set Access-Control-Allow-Methods "GET"
         Header set Access-Control-Allow-Headers "Content-Type, Authorization"
     </Files>
 </IfModule>
